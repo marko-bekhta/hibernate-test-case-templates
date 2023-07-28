@@ -15,6 +15,13 @@
 
 	<dependencies>
 		<dependency>
+			<groupId>com.oracle.database.jdbc</groupId>
+			<artifactId>ojdbc11</artifactId>
+			<version>23.2.0.0</version>
+			<!-- Works ok on the previous version of the driver: -->
+			<!--<version>21.10.0.0</version>-->
+		</dependency>
+		<dependency>
 			<groupId>org.hibernate.orm</groupId>
 			<artifactId>hibernate-core</artifactId>
 			<version>${version.org.hibernate}</version>
