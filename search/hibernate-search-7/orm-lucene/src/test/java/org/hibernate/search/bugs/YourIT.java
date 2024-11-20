@@ -19,28 +19,42 @@ public class YourIT extends SearchTestBase {
 	}
 
 	@Test
-	public void testYourBug() {
+	public void testYourBug() throws InterruptedException {
 		try ( Session s = getSessionFactory().openSession() ) {
-			YourAnnotatedEntity yourEntity1 = new YourAnnotatedEntity( 1L, "Jane Smith" );
-			YourAnnotatedEntity yourEntity2 = new YourAnnotatedEntity( 2L, "John Doe" );
+			// so that we do not index while we create entities:
+			Search.mapping( s.getSessionFactory() ).indexingPlanFilter( ctx -> ctx.exclude( YourAnnotatedEntity.class ) );
 
-			Transaction tx = s.beginTransaction();
-			s.persist( yourEntity1 );
-			s.persist( yourEntity2 );
-			tx.commit();
+			long id = 0L;
+			for ( int i = 0; i < 10_000; i++ ) {
+				Transaction tx = s.beginTransaction();
+				for ( int j = 0; j < 1000; j++ ) {
+					id++;
+					YourAnnotatedEntity entity = new YourAnnotatedEntity( id, "name " + id );
+					s.persist( entity );
+				}
+				System.err.println( "iteration : " + i );
+				s.flush();
+				s.clear();
+				tx.commit();
+			}
 		}
 
 		try ( Session session = getSessionFactory().openSession() ) {
 			SearchSession searchSession = Search.session( session );
 
-			List<YourAnnotatedEntity> hits = searchSession.search( YourAnnotatedEntity.class )
-					.where( f -> f.match().field( "name" ).matching( "smith" ) )
+			searchSession.massIndexer( YourAnnotatedEntity.class )
+					.threadsToLoadObjects( 2 )
+					.batchSizeToLoadObjects( 100 )
+					.startAndWait();
+
+			List<Long> hits = searchSession.search( YourAnnotatedEntity.class )
+					.select( f -> f.id( Long.class ) )
+					.where( f -> f.match().field( "name" ).matching( "100" ) )
 					.fetchHits( 20 );
 
 			assertThat( hits )
 					.hasSize( 1 )
-					.element( 0 ).extracting( YourAnnotatedEntity::getId )
-					.isEqualTo( 1L );
+					.contains( 100L );
 		}
 	}
 

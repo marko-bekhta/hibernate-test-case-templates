@@ -11,11 +11,14 @@ import org.junit.jupiter.api.BeforeEach;
 
 public abstract class SearchTestBase {
 
+	private DatabaseContainer container;
 	private SessionFactory sessionFactory;
 
 	@BeforeEach
 	public void setUp() {
+		container = new DatabaseContainer();
 		StandardServiceRegistryBuilder registryBuilder = new StandardServiceRegistryBuilder();
+		registryBuilder.applySetting( "hibernate.connection.url", container.setUp().getJdbcUrl() );
 		MetadataSources ms = new MetadataSources( registryBuilder.build() );
 		Class<?>[] annotatedClasses = getAnnotatedClasses();
 		if ( annotatedClasses != null ) {
@@ -32,7 +35,8 @@ public abstract class SearchTestBase {
 
 	@AfterEach
 	public void tearDown() {
-		try ( SessionFactory sessionFactoryToClose = this.sessionFactory ) {
+		try ( DatabaseContainer dbToClose = this.container;
+				SessionFactory sessionFactoryToClose = this.sessionFactory ) {
 			// Nothing to do: we just want resources to get closed.
 		}
 	}
