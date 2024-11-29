@@ -15,7 +15,13 @@
  */
 package org.hibernate.bugs;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import org.hibernate.cfg.AvailableSettings;
+import org.hibernate.engine.spi.SessionImplementor;
 
 import org.hibernate.testing.bytecode.enhancement.extension.BytecodeEnhanced;
 import org.hibernate.testing.orm.junit.DomainModel;
@@ -24,6 +30,13 @@ import org.hibernate.testing.orm.junit.SessionFactory;
 import org.hibernate.testing.orm.junit.SessionFactoryScope;
 import org.hibernate.testing.orm.junit.Setting;
 import org.junit.jupiter.api.Test;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 
 /**
  * This template demonstrates how to develop a test case for Hibernate ORM, using its built-in unit test framework.
@@ -34,8 +47,8 @@ import org.junit.jupiter.api.Test;
 @DomainModel(
 		annotatedClasses = {
 				// Add your entities here, e.g.:
-				// Foo.class,
-				// Bar.class
+				QuarkusLikeORMUnitTestCase.MyEntity.class,
+				QuarkusLikeORMUnitTestCase.MyOtherEntity.class
 		}
 )
 @ServiceRegistry(
@@ -63,11 +76,115 @@ import org.junit.jupiter.api.Test;
 @BytecodeEnhanced
 class QuarkusLikeORMUnitTestCase {
 
-	// Add your tests, using standard JUnit.
 	@Test
-	void hhh123Test(SessionFactoryScope scope) throws Exception {
-		scope.inTransaction( session -> {
-			// Do stuff...
+	void failsAsSessionIsClosed(SessionFactoryScope scope) throws Exception {
+		Long id = scope.fromTransaction( session -> {
+			MyEntity e = new MyEntity();
+			List<MyOtherEntity> list = new ArrayList<>();
+
+			MyOtherEntity e2 = new MyOtherEntity();
+			list.add( e2 );
+			e.setOtherEntities( list );
+			e2.entity = e;
+
+			session.persist( e );
+			session.persist( e2 );
+			return e.id;
 		} );
+
+		MyEntity myEntity = scope.fromTransaction( session -> session.find( MyEntity.class, id ) );
+		System.out.println( "=============================\nwill lazy load ?" );
+		// fails as session is closed before the thing is lazy-loaded
+		try {
+			assertThat( myEntity.getOtherEntities() ).hasSize( 1 );
+		}
+		finally {
+			System.out.println( "=============================\ndone" );
+		}
+		// ^ fails with:
+		// org.hibernate.LazyInitializationException: failed to lazily initialize a collection of role: org.hibernate.bugs.QuarkusLikeORMUnitTestCase$MyEntity.otherEntities: could not initialize proxy - no Session
+
+		// also this logs:
+		//
+ 		//=============================
+		//will lazy load ?
+		//=============================
+		//done
+	}
+
+	@Test
+	void passesAsSessionNotClosedBeforeAccessingLazyCollection(SessionFactoryScope scope) throws Exception {
+		Long id = scope.fromTransaction( session -> {
+			MyEntity e = new MyEntity();
+			List<MyOtherEntity> list = new ArrayList<>();
+
+			MyOtherEntity e2 = new MyOtherEntity();
+			list.add( e2 );
+			e.setOtherEntities( list );
+			e2.entity = e;
+
+			session.persist( e );
+			session.persist( e2 );
+			return e.id;
+		} );
+
+		SessionImplementor session = scope.getSessionFactory().openSession();
+		session.beginTransaction();
+		MyEntity entity = session.find( MyEntity.class, id );
+		session.getTransaction().commit();
+
+		System.out.println( "=============================\nwill lazy load ?" );
+		// passes as session is not closed before the thing is lazy-loaded
+		try {
+			assertThat( entity.getOtherEntities() ).hasSize( 1 );
+		}
+		finally {
+			System.out.println( "=============================\ndone" );
+		}
+		session.close();
+
+		// also this logs:
+		//
+		//=============================
+		//will lazy load ?
+		//Hibernate:
+		//    select
+		//        oe1_0."entity_id",
+		//        oe1_0.id
+		//    from
+		//        "QuarkusLikeORMUnitTestCase$MyOtherEntity" oe1_0
+		//    where
+		//        oe1_0."entity_id"=?
+		//=============================
+		//done
+	}
+
+	@Entity
+	public static class MyEntity {
+		@Id
+		@GeneratedValue
+		public Long id;
+
+		@OneToMany(mappedBy = "entity", fetch = FetchType.LAZY)
+		public List<MyOtherEntity> otherEntities;
+
+		public List<MyOtherEntity> getOtherEntities() {
+			return otherEntities;
+		}
+
+		public void setOtherEntities(List<MyOtherEntity> otherEntities) {
+			this.otherEntities = otherEntities;
+		}
+
+	}
+
+	@Entity
+	public static class MyOtherEntity {
+		@Id
+		@GeneratedValue
+		public Long id;
+
+		@ManyToOne
+		public MyEntity entity;
 	}
 }
