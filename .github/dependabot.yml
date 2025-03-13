@@ -1,26 +1,42 @@
 version: 2
 updates:
   - package-ecosystem: "maven"
-    directory: "/"
+    directory: "/validator"
     schedule:
       interval: "daily"
     groups:
-      quarkus:
+      validator:
         patterns:
+          - "org.hibernate.validator:*"
+      maven-plugins:
+        patterns:
+          - "*maven*plugin*"
+          - "org.apache.maven*:*"
+        exclude-patterns:
           - "io.quarkus*"
-          - "io.quarkiverse*"
+          - "org.hibernate*"
+      test:
+        patterns:
+          - "org.junit*"
+          - "org.apache.logging*"
+          - "com.h2database:*"
+          - "org.assertj:*"
+    ignore:
+      - dependency-name: "org.hibernate:*"
+        update-types: [ "version-update:semver-major" ]
+      - dependency-name: "org.hibernate.*:*"
+        update-types: [ "version-update:semver-major" ]
+  - package-ecosystem: "maven"
+    directory: "/search"
+    schedule:
+      interval: "daily"
+    groups:
       orm:
         patterns:
           - "org.hibernate.orm*:*"
       search:
         patterns:
           - "org.hibernate.search:*"
-      validator:
-        patterns:
-          - "org.hibernate.validator:*"
-      reactive:
-        patterns:
-          - "org.hibernate.reactive:*"
       maven-plugins:
         patterns:
           - "*maven*plugin*"
