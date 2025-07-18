@@ -9,7 +9,10 @@
 
 	<properties>
 		<version.com.h2database>2.3.232</version.com.h2database>
-		<version.junit-jupiter>5.12.2</version.junit-jupiter>
+		<!-- Just set the version of JUnit to something other than 5.12.x		-->
+		<version.junit-jupiter>5.13.2</version.junit-jupiter>
+		<!-- previous versions: -->
+		<!--<version.junit-jupiter>5.11.2</version.junit-jupiter>-->
 		<version.org.hibernate.orm7>7.0.6.Final</version.org.hibernate.orm7>
 		<version.org.assertj.assertj-core>3.27.3</version.org.assertj.assertj-core>
 	</properties>
